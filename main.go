@@ -10,6 +10,7 @@ import (
 var knownSubcommands = map[string]bool{
 	"history": true, "h": true,
 	"config": true,
+	"models": true,
 	"help":   true,
 }
 
@@ -21,6 +22,7 @@ var flagsWithValue = map[string]bool{
 // knownBoolFlags lists ask boolean flags that do not consume a value argument.
 var knownBoolFlags = map[string]bool{
 	"--raw": true, "--dry-run": true,
+	"--think": true, "--search": true,
 	"-h": true, "--help": true,
 	"-v": true, "--version": true,
 }
@@ -59,6 +61,14 @@ func firstPositionalArg(args []string) string {
 	return ""
 }
 
+// isKnownBoolFlagWithValue checks if arg is a known bool flag with =value (e.g. --think=false).
+func isKnownBoolFlagWithValue(arg string) bool {
+	if i := strings.Index(arg, "="); i > 0 {
+		return knownBoolFlags[arg[:i]]
+	}
+	return false
+}
+
 // reorderArgs extracts known ask flags, passthrough claude flags, and
 // positional arguments (prompt words) from the argument list.
 // ask flags go before "--", positional args go after.
@@ -81,8 +91,8 @@ func reorderArgs(args []string) []string {
 			continue
 		}
 
-		// ask bool flag (--raw, --dry-run, etc.)
-		if knownBoolFlags[arg] {
+		// ask bool flag (--raw, --dry-run, --think, --search, etc.)
+		if knownBoolFlags[arg] || isKnownBoolFlagWithValue(arg) {
 			flags = append(flags, arg)
 			continue
 		}

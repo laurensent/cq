@@ -16,6 +16,8 @@ type appConfig struct {
 	DefaultModel string `json:"default_model"`
 	RawOutput    bool   `json:"raw_output"`
 	Theme        string `json:"theme"`
+	Thinking     bool   `json:"thinking"`
+	WebSearch    bool   `json:"web_search"`
 }
 
 // resolvedProvider returns the configured provider name, defaulting to "anthropic".
@@ -71,6 +73,8 @@ func defaultConfigJSON() []byte {
 		DefaultModel: "",
 		RawOutput:    false,
 		Theme:        "auto",
+		Thinking:     true,
+		WebSearch:    false,
 	}
 	data, _ := json.MarshalIndent(cfg, "", "  ")
 	return append(data, '\n')

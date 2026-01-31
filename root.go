@@ -12,6 +12,8 @@ var version = "dev"
 var model string
 var dryRun bool
 var rawOutput bool
+var thinkFlag bool
+var searchFlag bool
 var cfg appConfig
 
 var rootCmd = &cobra.Command{
@@ -88,6 +90,8 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&model, "model", "m", "", "model alias or full ID (provider-specific: sonnet, gpt4o, flash, etc.)")
 	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "print the claude command instead of running it")
 	rootCmd.PersistentFlags().BoolVar(&rawOutput, "raw", false, "output raw text without markdown rendering")
+	rootCmd.PersistentFlags().BoolVar(&thinkFlag, "think", false, "enable extended thinking")
+	rootCmd.PersistentFlags().BoolVar(&searchFlag, "search", false, "enable web search")
 
 	// Apply config defaults before command execution
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
@@ -98,11 +102,18 @@ func init() {
 		if !cmd.Flags().Changed("raw") && cfg.RawOutput {
 			rawOutput = true
 		}
+		if !cmd.Flags().Changed("think") {
+			thinkFlag = cfg.Thinking
+		}
+		if !cmd.Flags().Changed("search") {
+			searchFlag = cfg.WebSearch
+		}
 	}
 
 	historyCmd.AddCommand(historyClearCmd)
 	rootCmd.AddCommand(historyCmd)
 	rootCmd.AddCommand(configCmd)
+	rootCmd.AddCommand(modelsCmd)
 
 	rootCmd.SetVersionTemplate("ask version {{.Version}}\n")
 

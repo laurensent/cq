@@ -8,6 +8,18 @@ import (
 	"strings"
 )
 
+// RemoteModel represents a model returned by a provider's API.
+type RemoteModel struct {
+	ID   string
+	Name string
+}
+
+// FeatureFlags controls optional provider features like thinking and web search.
+type FeatureFlags struct {
+	Thinking  bool
+	WebSearch bool
+}
+
 // Provider defines the interface for LLM API providers.
 type Provider interface {
 	Name() string
@@ -15,7 +27,8 @@ type Provider interface {
 	ModelAliases() []string
 	DefaultModel() string
 	EnvKey() string
-	Run(ctx context.Context, prompt, model, apiKey, baseURL string) error
+	Run(ctx context.Context, prompt, model, apiKey, baseURL string, features FeatureFlags) error
+	ListModels(ctx context.Context, apiKey, baseURL string) ([]RemoteModel, error)
 }
 
 // providers is the registry of available providers.

@@ -21,10 +21,12 @@ const (
 	stepModel
 	stepRawOutput
 	stepTheme
+	stepThinking
+	stepWebSearch
 	stepConfirm
 )
 
-const wizardTotalSteps = 8
+const wizardTotalSteps = 10
 
 var (
 	wizardAccent    = lipgloss.Color("#E36C38")
@@ -57,8 +59,9 @@ func newConfigWizard() configWizard {
 		step:  stepMode,
 		input: ti,
 		config: appConfig{
-			Mode:  "cli",
-			Theme: "auto",
+			Mode:     "cli",
+			Theme:    "auto",
+			Thinking: true,
 		},
 	}
 }
@@ -205,6 +208,18 @@ func (m configWizard) confirmSelection() (tea.Model, tea.Cmd) {
 		m.cursor = 0
 	case stepTheme:
 		m.config.Theme = opts[m.cursor]
+		if m.config.Mode == "api" {
+			m.step = stepThinking
+		} else {
+			m.step = stepConfirm
+		}
+		m.cursor = 0
+	case stepThinking:
+		m.config.Thinking = opts[m.cursor] == "true"
+		m.step = stepWebSearch
+		m.cursor = 0
+	case stepWebSearch:
+		m.config.WebSearch = opts[m.cursor] == "true"
 		m.step = stepConfirm
 		m.cursor = 0
 	case stepConfirm:
@@ -245,6 +260,10 @@ func (m configWizard) currentOptions() []string {
 		return []string{"false", "true"}
 	case stepTheme:
 		return []string{"auto", "dark", "light", "dracula", "pink", "ascii", "notty"}
+	case stepThinking:
+		return []string{"true", "false"}
+	case stepWebSearch:
+		return []string{"false", "true"}
 	case stepConfirm:
 		return []string{"Save", "Cancel"}
 	default:
@@ -278,6 +297,10 @@ func (m configWizard) stepTitle() string {
 		return "Raw Output"
 	case stepTheme:
 		return "Theme"
+	case stepThinking:
+		return "Extended Thinking"
+	case stepWebSearch:
+		return "Web Search"
 	case stepConfirm:
 		return "Confirm"
 	default:
@@ -301,6 +324,10 @@ func (m configWizard) stepDescription() string {
 		return "Skip markdown rendering and output raw text?"
 	case stepTheme:
 		return "Choose the markdown rendering theme"
+	case stepThinking:
+		return "Enable extended thinking for deeper reasoning?"
+	case stepWebSearch:
+		return "Enable web search for up-to-date information?"
 	case stepConfirm:
 		return "Review your configuration"
 	default:
@@ -377,6 +404,10 @@ func (m configWizard) renderSummary() string {
 	kv("Default Model", m.config.DefaultModel)
 	kv("Raw Output", fmt.Sprintf("%v", m.config.RawOutput))
 	kv("Theme", m.config.Theme)
+	if m.config.Mode == "api" {
+		kv("Thinking", fmt.Sprintf("%v", m.config.Thinking))
+		kv("Web Search", fmt.Sprintf("%v", m.config.WebSearch))
+	}
 	return b.String()
 }
 

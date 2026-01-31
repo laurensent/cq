@@ -27,10 +27,12 @@ func runAPI(prompt, model string, cfg appConfig) error {
 	}
 	modelID := p.ResolveModel(model)
 
+	features := FeatureFlags{Thinking: thinkFlag, WebSearch: searchFlag}
+
 	if dryRun {
-		fmt.Printf("[%s] model=%s prompt=%q\n", providerName, modelID, prompt)
+		fmt.Printf("[%s] model=%s thinking=%v search=%v prompt=%q\n", providerName, modelID, features.Thinking, features.WebSearch, prompt)
 		return nil
 	}
 
-	return p.Run(context.TODO(), prompt, model, apiKey, cfg.BaseURL)
+	return p.Run(context.TODO(), prompt, model, apiKey, cfg.BaseURL, features)
 }

@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
 
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
@@ -71,7 +74,76 @@ func (p openaiCompatProvider) ResolveModel(alias string) string {
 	return alias
 }
 
-func (p openaiCompatProvider) Run(ctx context.Context, prompt, model, apiKey, baseURL string) error {
+// isChatModel filters OpenAI models to chat-capable ones.
+func isChatModel(id string) bool {
+	prefixes := []string{"gpt-", "o1", "o3", "o4", "chatgpt"}
+	for _, p := range prefixes {
+		if strings.HasPrefix(id, p) {
+			return true
+		}
+	}
+	return false
+}
+
+func (p openaiCompatProvider) ListModels(ctx context.Context, apiKey, baseURL string) ([]RemoteModel, error) {
+	if p.name == "ollama" {
+		return p.listOllamaModels(baseURL)
+	}
+
+	if baseURL == "" {
+		baseURL = p.defaultURL
+	}
+
+	opts := []option.RequestOption{option.WithBaseURL(baseURL)}
+	if apiKey != "" {
+		opts = append(opts, option.WithAPIKey(apiKey))
+	}
+	client := openai.NewClient(opts...)
+
+	var models []RemoteModel
+	iter := client.Models.ListAutoPaging(ctx)
+	for iter.Next() {
+		m := iter.Current()
+		if p.name == "openai" && !isChatModel(m.ID) {
+			continue
+		}
+		models = append(models, RemoteModel{ID: m.ID})
+	}
+	if iter.Err() != nil {
+		return nil, fmt.Errorf("%s API error: %v", p.name, iter.Err())
+	}
+	return models, nil
+}
+
+func (p openaiCompatProvider) listOllamaModels(baseURL string) ([]RemoteModel, error) {
+	if baseURL == "" {
+		baseURL = p.defaultURL
+	}
+	tagsURL := strings.TrimSuffix(baseURL, "/v1") + "/api/tags"
+
+	resp, err := http.Get(tagsURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to Ollama at %s: %w", tagsURL, err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Models []struct {
+			Name string `json:"name"`
+		} `json:"models"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to parse Ollama response: %w", err)
+	}
+
+	var models []RemoteModel
+	for _, m := range result.Models {
+		models = append(models, RemoteModel{ID: m.Name})
+	}
+	return models, nil
+}
+
+func (p openaiCompatProvider) Run(ctx context.Context, prompt, model, apiKey, baseURL string, features FeatureFlags) error {
 	modelID := p.ResolveModel(model)
 	if modelID == "" {
 		modelID = p.ResolveModel(p.defaultMdl)
@@ -87,13 +159,21 @@ func (p openaiCompatProvider) Run(ctx context.Context, prompt, model, apiKey, ba
 	}
 	client := openai.NewClient(opts...)
 
+	params := openai.ChatCompletionNewParams{
+		Model: openai.ChatModel(modelID),
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage(prompt),
+		},
+	}
+
+	if features.WebSearch && p.name == "openai" {
+		params.WebSearchOptions = openai.ChatCompletionNewParamsWebSearchOptions{
+			SearchContextSize: "medium",
+		}
+	}
+
 	return runStreaming(func(emit func(string)) error {
-		stream := client.Chat.Completions.NewStreaming(ctx, openai.ChatCompletionNewParams{
-			Model: openai.ChatModel(modelID),
-			Messages: []openai.ChatCompletionMessageParamUnion{
-				openai.UserMessage(prompt),
-			},
-		})
+		stream := client.Chat.Completions.NewStreaming(ctx, params)
 
 		for stream.Next() {
 			chunk := stream.Current()
